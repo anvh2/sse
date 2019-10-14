@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/anvh2/sse-example/sse"
+	"github.com/anvh2/sse/sse"
 )
 
 func main() {
