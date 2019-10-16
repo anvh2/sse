@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/anvh2/sse/sse"
+	"github.com/go-redis/redis"
 )
 
 func main() {
@@ -17,7 +18,16 @@ func main() {
 			time.Sleep(2 * time.Second)
 			eventString := fmt.Sprintf("the time is %v", time.Now())
 			log.Println("Sending event")
-			broker.Notifier <- []byte(eventString)
+			
+			redisCli := redis.NewClient(&redis.Options{
+				Addr: "localhost:6379",
+			})
+
+			if err := redisCli.Ping().Err(); err != nil {
+				panic(err)
+			}
+
+			redisCli.Publish("foo", eventString)
 		}
 	}()
 

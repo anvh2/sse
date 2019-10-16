@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+
+	"github.com/go-redis/redis"
 )
 
 // MessageChan -
@@ -39,28 +41,58 @@ func NewServer() *Broker {
 		quitc:          make(chan struct{}),
 	}
 
-	go borker.run()
+	borker.run()
 
 	return borker
 }
 
 func (broker *Broker) run() {
-	for {
-		select {
-		case s := <-broker.newClients:
-			broker.clients[s] = true
-			log.Printf("Client added. %d registered clients", len(broker.clients))
-		case s := <-broker.closingClients:
-			delete(broker.clients, s)
-			log.Printf("Removed client. %d registered clients", len(broker.clients))
-		case event := <-broker.Notifier:
-			for client := range broker.clients {
-				client <- event
+	// setup SSE monitor
+	go func() {
+		for {
+			select {
+			case s := <-broker.newClients:
+				broker.clients[s] = true
+				log.Printf("Client added. %d registered clients", len(broker.clients))
+			case s := <-broker.closingClients:
+				delete(broker.clients, s)
+				log.Printf("Removed client. %d registered clients", len(broker.clients))
+			case event := <-broker.Notifier:
+				for client := range broker.clients {
+					client <- event
+				}
+			case <-broker.quitc:
+				return
 			}
-		case <-broker.quitc:
+		}
+	}()
+
+	// setup PubSub monitor
+	go func() {
+		redisCli := redis.NewClient(&redis.Options{
+			Addr: "localhost:6379",
+		})
+
+		if err := redisCli.Ping().Err(); err != nil {
+			// log
 			return
 		}
-	}
+
+		psCli := redisCli.PSubscribe("foo")
+		defer psCli.Close()
+
+		for {
+			value, err := psCli.Receive()
+			if err != nil {
+				// log
+			}
+			fmt.Println("Received...")
+
+			if msg, _ := value.(*redis.Message); msg != nil {
+				broker.Notifier <- []byte(msg.Payload)
+			}
+		}
+	}()
 }
 
 // ServeHTTP wraps HTTP handlers
