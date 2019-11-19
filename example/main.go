@@ -3,22 +3,25 @@ package main
 import (
 	"fmt"
 	"log"
-	"net/http"
 	"time"
 
-	"github.com/anvh2/sse/sse"
+	sse "github.com/anvh2/sse/server"
 	"github.com/go-redis/redis"
 )
 
 func main() {
 	broker := sse.NewServer()
+	err := broker.Run()
+	if err != nil {
+		log.Fatal("HTTP server error: ", err)
+	}
 
 	go func() {
 		for {
 			time.Sleep(2 * time.Second)
 			eventString := fmt.Sprintf("the time is %v", time.Now())
 			log.Println("Sending event")
-			
+
 			redisCli := redis.NewClient(&redis.Options{
 				Addr: "localhost:6379",
 			})
@@ -30,9 +33,4 @@ func main() {
 			redisCli.Publish("foo", eventString)
 		}
 	}()
-
-	err := http.ListenAndServe("localhost:8000", broker)
-	if err != nil {
-		log.Fatal("HTTP server error: ", err)
-	}
 }

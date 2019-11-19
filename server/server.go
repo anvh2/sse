@@ -33,20 +33,17 @@ type Broker struct {
 
 // NewServer -
 func NewServer() *Broker {
-	borker := &Broker{
+	return &Broker{
 		Notifier:       make(chan MessageChan, 1),
 		newClients:     make(chan chan MessageChan),
 		closingClients: make(chan chan MessageChan),
 		clients:        make(map[chan MessageChan]bool),
 		quitc:          make(chan struct{}),
 	}
-
-	borker.run()
-
-	return borker
 }
 
-func (broker *Broker) run() {
+// Run -
+func (broker *Broker) Run() error {
 	// setup SSE monitor
 	go func() {
 		for {
@@ -93,6 +90,7 @@ func (broker *Broker) run() {
 			}
 		}
 	}()
+	return http.ListenAndServe("localhost:8000", broker)
 }
 
 // ServeHTTP wraps HTTP handlers
